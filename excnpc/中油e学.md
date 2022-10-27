@@ -6,4 +6,4 @@
 ##使用方法
 安装好tampermonkey并安装好此脚本，确保脚本处于生效中，打开至列表页等待自动选集播放即可。
 
-持续维护中，如遇问题请反馈。
+持续维护中，如遇问题请反馈至https://github.com/johnlin0207/tampermonkey-scripts/issues

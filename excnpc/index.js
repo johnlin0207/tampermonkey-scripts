@@ -55,6 +55,7 @@
                 clearInterval(findVideoInListAndOpenTimer);
                 const thisId2 = $(firstStartOperation).parent().attr('data-resource-id');
                 const prevId = localStorage.getItem('prevId');
+                const isPlaying = localStorage.getItem('isPlaying');
                 const notInPlaying = isPlaying === 'false' || isPlaying === null;
                 // 存储的之前播放的id不等于现在列表里的第一条“开始学习”id，说明需要播放当前的这条“开始学习”
                 // 或者当前没有正在播放的视频，直接播放这条“正在播放”
