@@ -147,7 +147,7 @@
             // 综合考虑后采用清除isPlaying方案，后果一定概率会打开多出的页面但换取了时间
             count++;
             if (count > recheck && localStorage.getItem('isPlaying') !== 'true') {
-                console.log(`%c检测到页面打开后${recheck}s依然没有跳转，清空isPlaying重试`, 'color: yellow');
+                console.log(`%c检测到页面打开后${recheck}s依然没有跳转，将会清空isPlaying重试`, 'color: yellow');
                 // 若5s后isPlaying处于hasOpened或waiting阶段则会一直等待无法正常跳转。因此直接移除isPlaying，可能会出现重复打开同一页面问题，不过此种情况出现概率小，可以忽略，
                 localStorage.removeItem('isPlaying');
                 o.listPageFn();
