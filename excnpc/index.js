@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         中油e学自动续集脚本
 // @namespace    http://tampermonkey.net/
-// @version      0.7.15
+// @version      0.7.16
 // @description  自动续集播放列表，监听当前播放状态自动开始播放
 // @author       https://github.com/johnlin0207
 // @match        https://www.excnpc.com/
@@ -35,8 +35,8 @@
                 const isPlaying = localStorage.getItem('isPlaying');
                 const notInPlaying = isPlaying === 'false' || isPlaying === null;
                 console.log(`2.isPlaying:%c${isPlaying}`, 'color: black;background:yellow;');
-                console.log(`3.列表中第一条“继续学习”视频id与之前的prevId%c${prevId !== thisId ? '不' : ''}%c相等`, 'color: black;background:yellow;', 'color: white');
-                // 存储的“正在播放”id不等于现在列表里的第一条“正在播放”id，说明需要播放当前的这条“正在播放”
+                console.log(`3.列表中第一条“继续学习”视频id与之前的prevId%c${prevId !== thisId ? '不' : ''}相等`, 'color: black;background:yellow;');
+                // 存储的之前播放的id不等于现在列表里的第一条“正在播放”id，说明需要播放当前的这条“正在播放”
                 // 或者当前没有正在播放的视频，直接播放这条“正在播放”
                 if (prevId !== thisId || notInPlaying) {
                     console.log('4.点击继续学习，打开新窗口开始播放');
@@ -52,10 +52,16 @@
                 // 找到第一个开始学习
                 console.log('没有"继续学习"选项，点击第一条"开始学习"开始播放')
                 firstStartOperation = operation;
-                firstStartOperation.click();
                 clearInterval(findVideoInListAndOpenTimer);
-                let thisId2 = $(firstStartOperation).parent().attr('data-resource-id');
-                localStorage.setItem('prevId', thisId2)
+                const thisId2 = $(firstStartOperation).parent().attr('data-resource-id');
+                const prevId = localStorage.getItem('prevId');
+                const notInPlaying = isPlaying === 'false' || isPlaying === null;
+                // 存储的之前播放的id不等于现在列表里的第一条“开始学习”id，说明需要播放当前的这条“开始学习”
+                // 或者当前没有正在播放的视频，直接播放这条“正在播放”
+                if (prevId !== thisId2 || notInPlaying) {
+                    firstStartOperation.click();
+                    localStorage.setItem('prevId', thisId2);
+                }
                 return false
             }
         }
@@ -76,7 +82,7 @@
         }
 
         // 如果视频暂停，点击播放
-        if (videoDom.paused) {
+        if (videoDom && videoDom.paused) {
             videoDom.play();
         }
 
