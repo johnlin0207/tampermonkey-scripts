@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         中油e学自动续集脚本
 // @namespace    http://tampermonkey.net/
-// @version      0.7.14
+// @version      0.7.15
 // @description  自动续集播放列表，监听当前播放状态自动开始播放
 // @author       https://github.com/johnlin0207
 // @match        https://www.excnpc.com/
@@ -115,11 +115,12 @@
             const listBox = $('.subject-catalog').find('.catalog-state-info')[0];
             if (listBox) {
                 console.log('1.准备执行列表操作');
+                // 页面加载完成，清除定时器
+                clearInterval(findVideoInListAndOpenTimer);
                 // 返回true说明没找到可执行的视频
                 const finished = o.listPageFn();
                 if(finished) {
                     console.log('%c√没有可播放的视频', 'color: green');
-                    clearInterval(findVideoInListAndOpenTimer)
                 } else {
                     console.log(`6.若未打开视频播放，等待程序${recheck}s后重新执行`);
                 }
