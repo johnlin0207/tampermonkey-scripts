@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         中油e学自动续集脚本
 // @namespace    http://tampermonkey.net/
-// @version      0.7.16
+// @version      0.8
 // @description  自动续集播放列表，监听当前播放状态自动开始播放
 // @author       https://github.com/johnlin0207
 // @match        https://www.excnpc.com/
@@ -39,7 +39,7 @@
                 // 存储的之前播放的id不等于现在列表里的第一条“正在播放”id，说明需要播放当前的这条“正在播放”
                 // 或者当前没有正在播放的视频，直接播放这条“正在播放”
                 if (prevId !== thisId || notInPlaying) {
-                    console.log('4.点击继续学习，打开新窗口开始播放');
+                    console.log('4.点击继续学习，将会打开新窗口开始播放');
                     continueOperation.click();
                     clearInterval(findVideoInListAndOpenTimer);
                     // 更新prevId为当前点击了的播放
@@ -50,7 +50,7 @@
                 return false
             } else if (thisOpt.text().trim() === '开始学习') {
                 // 找到第一个开始学习
-                console.log('没有"继续学习"选项，点击第一条"开始学习"开始播放')
+                console.log('2.没有"继续学习"选项，点击第一条"开始学习"开始播放')
                 firstStartOperation = operation;
                 clearInterval(findVideoInListAndOpenTimer);
                 const thisId2 = $(firstStartOperation).parent().attr('data-resource-id');
@@ -117,19 +117,26 @@
     }
 
     o.listIndexFn = () => {
-        let count = 0, recheck = 5;
+        let count = 0, recheck = 3;
         findVideoInListAndOpenTimer = setInterval(() => {
             const listBox = $('.subject-catalog').find('.catalog-state-info')[0];
             if (listBox) {
-                console.log('1.准备执行列表操作');
                 // 页面加载完成，清除定时器
                 clearInterval(findVideoInListAndOpenTimer);
+                $(".page-main-wrapper").prepend(`<button class='clearAndPlay'>若${recheck}s后依然没有视频在播放，请点此按钮一次</button>`);
+                $(".clearAndPlay").on('click', function(){
+                    // 异常关闭浏览器视频播放页，例如浏览器崩溃卡死强行关闭等导致isPlaying未正常清除的情况，需要手动清除播放状态重新播放
+                    localStorage.removeItem('isPlaying');
+                    console.log('1.手动点击按钮执行列表操作');
+                    o.listPageFn();
+                })
+                console.log('1.准备执行列表操作');
                 // 返回true说明没找到可执行的视频
                 const finished = o.listPageFn();
                 if(finished) {
                     console.log('%c√没有可播放的视频', 'color: green');
                 } else {
-                    console.log(`6.若未打开视频播放，等待程序${recheck}s后重新执行`);
+                    console.log(`6.若未自动打开视频播放，等待程序${recheck}s后自动重新执行`);
                 }
                 const refreshGap = 60;
                 const timer = setInterval(() => {
@@ -139,6 +146,20 @@
                 if(finished){
                     clearInterval(timer)
                 }
+
+                // 确认是否自动跳转失败
+                // 若页面超时5s但未打开视频播放页面(isPlaying !== true)
+                // 原因1，错误的isPlaying状态-需要清除
+                // 原因2，偶遇isPlaying为waiting或hasOpened-概率极低
+                // 综合考虑后采用清除isPlaying方案，后果一定概率会打开多出的页面但换取了时间
+                setTimeout(() => {
+                    if (localStorage.getItem('isPlaying') !== 'true') {
+                        console.log(`%c检测到页面打开后${recheck}s依然没有跳转，将会清空isPlaying重试`, 'color: yellow');
+                        // 若3s后isPlaying处于hasOpened或waiting阶段则会一直等待无法正常跳转。因此直接移除isPlaying，可能会出现重复打开同一页面问题，不过此种情况出现概率小，可以忽略，
+                        localStorage.removeItem('isPlaying');
+                        o.listPageFn();
+                    }
+                }, recheck * 1000)
             } else {
                 console.log('0.等待页面加载完成...');
                 // 若页面超时20s，刷新页面
@@ -146,18 +167,6 @@
                     clearInterval(findVideoInListAndOpenTimer);
                     location.reload();
                 }
-            }
-            // 确认是否自动跳转失败
-            // 若页面超时5s但未打开视频播放页面(isPlaying !== true)
-            // 原因1，错误的isPlaying状态-需要清除
-            // 原因2，偶遇isPlaying为waiting或hasOpened-概率极低
-            // 综合考虑后采用清除isPlaying方案，后果一定概率会打开多出的页面但换取了时间
-            count++;
-            if (count > recheck && localStorage.getItem('isPlaying') !== 'true') {
-                console.log(`%c检测到页面打开后${recheck}s依然没有跳转，将会清空isPlaying重试`, 'color: yellow');
-                // 若5s后isPlaying处于hasOpened或waiting阶段则会一直等待无法正常跳转。因此直接移除isPlaying，可能会出现重复打开同一页面问题，不过此种情况出现概率小，可以忽略，
-                localStorage.removeItem('isPlaying');
-                o.listPageFn();
             }
         }, 1000)
     }
@@ -212,5 +221,20 @@
                 }
             }, 1000)
         }
+
+        // 动态添加css
+        const style = document.createElement('style'); 
+        style.type = 'text/css';
+        style.innerHTML = `
+        .clearAndPlay {
+            background: rgba(255,255,0,1);
+            cursor: pointer;
+        }
+
+        .clearAndPlay:hover {
+            background: rgba(255,255,0,.4);
+        }
+        `; 
+        document.getElementsByTagName('head').item(0).appendChild(style); 
     })
 })();
