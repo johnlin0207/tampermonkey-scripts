@@ -16,7 +16,7 @@
     let findVideoInListAndOpenTimer = null;
     const o = {};
     // 视频列表页处理函数
-    o.listPageFn = () => {
+    o.findAndPlayVideoFn = () => {
         let playLists = $('.subject-catalog').find('.catalog-state-info');
         let playItemList = [], firstStartOperation = null, continueOperation = null;
         for (let item of $(playLists)) {
@@ -40,10 +40,13 @@
                 // 或者当前没有正在播放的视频，直接播放这条“正在播放”
                 if (prevId !== thisId || notInPlaying) {
                     console.log('4.点击继续学习，将会打开新窗口开始播放');
-                    continueOperation.click();
-                    clearInterval(findVideoInListAndOpenTimer);
-                    // 更新prevId为当前点击了的播放
-                    localStorage.setItem('prevId', thisId)
+                    setTimeout(() => {
+                        // 页面刷新后数据接口可能还没返回数据，这时点击在应用数据处会报缺少参数的错误
+                        $(continueOperation).click();
+                        clearInterval(findVideoInListAndOpenTimer);
+                        // 更新prevId为当前点击了的播放
+                        localStorage.setItem('prevId', thisId)
+                    }, 500)
                 } else {
                     console.log('5.当前的继续学习正在播放，无需操作')
                 }
@@ -57,11 +60,14 @@
                 const prevId = localStorage.getItem('prevId');
                 const isPlaying = localStorage.getItem('isPlaying');
                 const notInPlaying = isPlaying === 'false' || isPlaying === null;
+                console.log(thisId2, prevId, isPlaying, notInPlaying)
                 // 存储的之前播放的id不等于现在列表里的第一条“开始学习”id，说明需要播放当前的这条“开始学习”
                 // 或者当前没有正在播放的视频，直接播放这条“正在播放”
                 if (prevId !== thisId2 || notInPlaying) {
-                    firstStartOperation.click();
-                    localStorage.setItem('prevId', thisId2);
+                    setTimeout(() => {
+                        $(firstStartOperation).click();
+                        localStorage.setItem('prevId', thisId2);
+                    }, 500)
                 }
                 return false
             }
@@ -77,7 +83,7 @@
             $('.alert-wrapper .btn-ok').click();
         }
 
-        // 若出现网络不稳定的提示（非弹窗形式需要刷新页面或先点击暂停再点击播放重新开始播放，弹窗形式直接点击确认）
+        // 若出现网络不稳定的提示（弹窗形式直接点击确认）
         if ($('.vjs-netslow .slow-txt').text() === '网络不稳定，请刷新重试') {
             $('.vjs-netslow .slow-img').click();
         }
@@ -116,50 +122,22 @@
         }
     }
 
-    o.listIndexFn = () => {
-        let count = 0, recheck = 3;
+    // 列表加载完成
+    o.onListMounted = () => {
+        let count = 0;
         findVideoInListAndOpenTimer = setInterval(() => {
             const listBox = $('.subject-catalog').find('.catalog-state-info')[0];
+            // 等待列表加载完成
             if (listBox) {
                 // 页面加载完成，清除定时器
                 clearInterval(findVideoInListAndOpenTimer);
-                $(".page-main-wrapper").prepend(`<button class='clearAndPlay'>若${recheck}s后依然没有视频在播放，请点此按钮一次</button>`);
-                $(".clearAndPlay").on('click', function(){
-                    // 异常关闭浏览器视频播放页，例如浏览器崩溃卡死强行关闭等导致isPlaying未正常清除的情况，需要手动清除播放状态重新播放
-                    localStorage.removeItem('isPlaying');
-                    console.log('1.手动点击按钮执行列表操作');
-                    o.listPageFn();
-                })
-                console.log('1.准备执行列表操作');
-                // 返回true说明没找到可执行的视频
-                const finished = o.listPageFn();
-                if(finished) {
-                    console.log('%c√没有可播放的视频', 'color: green');
-                } else {
-                    console.log(`6.若未自动打开视频播放，等待程序${recheck}s后自动重新执行`);
+                window.onerror = function(message, source, lineno, colno, error) { 
+                    console.error('插件捕获的全局错误');
+                    console.error(message);
+                    console.error(source);
+                    console.error(error);
                 }
-                const refreshGap = 60;
-                const timer = setInterval(() => {
-                    console.log('7.即将刷新页面...');
-                    location.reload();
-                }, 1000 * refreshGap);
-                if(finished){
-                    clearInterval(timer)
-                }
-
-                // 确认是否自动跳转失败
-                // 若页面超时5s但未打开视频播放页面(isPlaying !== true)
-                // 原因1，错误的isPlaying状态-需要清除
-                // 原因2，偶遇isPlaying为waiting或hasOpened-概率极低
-                // 综合考虑后采用清除isPlaying方案，后果一定概率会打开多出的页面但换取了时间
-                setTimeout(() => {
-                    if (localStorage.getItem('isPlaying') !== 'true') {
-                        console.log(`%c检测到页面打开后${recheck}s依然没有跳转，将会清空isPlaying重试`, 'color: yellow');
-                        // 若3s后isPlaying处于hasOpened或waiting阶段则会一直等待无法正常跳转。因此直接移除isPlaying，可能会出现重复打开同一页面问题，不过此种情况出现概率小，可以忽略，
-                        localStorage.removeItem('isPlaying');
-                        o.listPageFn();
-                    }
-                }, recheck * 1000)
+                o.listPageFn();
             } else {
                 console.log('0.等待页面加载完成...');
                 // 若页面超时20s，刷新页面
@@ -171,6 +149,48 @@
         }, 1000)
     }
 
+    o.listPageFn = () => {
+        const recheck = 5;// 时间间隔不能过过短，否则第一次打开的页面isPlaying还未变为true，会出现重复打开同一页面的情况
+        // 生成按钮，防止isPlaying错误状态时一直无法执行视频播放
+        $(".page-main-wrapper").prepend(`<button class='clearAndPlay' title="异常关闭浏览器的视频播放页，例如浏览器崩溃卡死强行关闭等导致记录的播放状态异常，点击可手动重置状态，之后的自动播放一般不会再次出现此问题">若打开页面${recheck}s后依然没有视频打开或后台有视频正在播放，请点此按钮一次</button>`);
+        $(".clearAndPlay").on('click', function(){
+            // 异常关闭浏览器的视频播放页，例如浏览器崩溃卡死强行关闭等导致isPlaying未正常清除的情况，需要手动清除播放状态重新播放
+            localStorage.removeItem('isPlaying');
+            console.log('1.手动点击按钮执行列表操作');
+            o.findAndPlayVideoFn();
+        })
+        console.log('1.准备执行列表操作');
+        // 返回true说明没找到可执行的视频
+        const finished = o.findAndPlayVideoFn();
+        if(finished) {
+            console.log('%c√没有可播放的视频', 'color: green');
+        } else {
+            console.log(`6.若未自动打开视频播放，等待程序${recheck}s后自动重新执行`);
+        }
+        const refreshGap = 60;
+        const timer = setInterval(() => {
+            console.log('7.即将刷新页面...');
+            location.reload();
+        }, 1000 * refreshGap);
+        if(finished){
+            clearInterval(timer);
+        }
+
+        // 确认是否自动跳转失败
+        // 若页面超时5s但未打开视频播放页面(isPlaying !== true)
+        // 原因1，错误的isPlaying状态-需要清除
+        // 原因2，偶遇isPlaying为waiting或hasOpened-概率极低
+        // 综合考虑后采用清除isPlaying方案，后果一定概率会打开多出的页面但换取了时间
+        setTimeout(() => {
+            if (localStorage.getItem('isPlaying') !== 'true') {
+                console.log(`%c检测到页面打开后${recheck}s依然没有跳转，将会清空isPlaying重试`, 'color: yellow');
+                // 若5s后isPlaying处于hasOpened或waiting阶段则会一直等待无法正常跳转。因此直接移除isPlaying，可能会出现重复打开同一页面问题，不过此种情况出现概率小，可以忽略，
+                localStorage.removeItem('isPlaying');
+                o.findAndPlayVideoFn();
+            }
+        }, recheck * 1000)
+    }
+
     $(document).ready(function () {
         // 如果当前页面是列表页面
         if (location.hash.match(/^#\/study\/subject\/detail/)) {
@@ -178,11 +198,11 @@
             if (!localStorage.getItem('firstUse')) {
                 if (window.confirm('是否要开始执行自动续集播放？注意首次使用插件时浏览器会默认阻止自动打开新页签，请放行！否则插件无法正常工作')) {
                     localStorage.setItem('firstUse', 'false')
-                    o.listIndexFn();
+                    o.onListMounted();
                 }
             } else {
                 // 非首次使用插件
-                o.listIndexFn();
+                o.onListMounted();
             }
         }
 
@@ -223,7 +243,7 @@
         }
 
         // 动态添加css
-        const style = document.createElement('style'); 
+        const style = document.createElement('style');
         style.type = 'text/css';
         style.innerHTML = `
         .clearAndPlay {
@@ -234,7 +254,7 @@
         .clearAndPlay:hover {
             background: rgba(255,255,0,.4);
         }
-        `; 
-        document.getElementsByTagName('head').item(0).appendChild(style); 
+        `;
+        document.getElementsByTagName('head').item(0).appendChild(style);
     })
 })();
