@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         中油e学自动续集脚本
 // @namespace    http://tampermonkey.net/
-// @version      0.8
+// @version      0.8.1
 // @description  自动续集播放列表，监听当前播放状态自动开始播放
 // @author       https://github.com/johnlin0207
 // @match        https://www.excnpc.com/
@@ -40,13 +40,15 @@
                 // 或者当前没有正在播放的视频，直接播放这条“正在播放”
                 if (prevId !== thisId || notInPlaying) {
                     console.log('4.点击继续学习，将会打开新窗口开始播放');
-                    setTimeout(() => {
-                        // 页面刷新后数据接口可能还没返回数据，这时点击在应用数据处会报缺少参数的错误
+                    // click操作可能会报错TypeError: Cannot read properties of undefined (reading 'source')，具体原因暂未知，可能是缺少传参所致，放在try中
+                    try {
                         $(continueOperation).click();
-                        clearInterval(findVideoInListAndOpenTimer);
-                        // 更新prevId为当前点击了的播放
-                        localStorage.setItem('prevId', thisId)
-                    }, 500)
+                    } catch(e){
+                        console.log(`%c自动点击第一条继续学习出错，stack: ${e.stack}`, 'color: red');
+                    }
+                    clearInterval(findVideoInListAndOpenTimer);
+                    // 更新prevId为当前点击了的播放
+                    localStorage.setItem('prevId', thisId);
                 } else {
                     console.log('5.当前的继续学习正在播放，无需操作')
                 }
@@ -64,10 +66,13 @@
                 // 存储的之前播放的id不等于现在列表里的第一条“开始学习”id，说明需要播放当前的这条“开始学习”
                 // 或者当前没有正在播放的视频，直接播放这条“正在播放”
                 if (prevId !== thisId2 || notInPlaying) {
-                    setTimeout(() => {
+                    // click操作可能会报错TypeError: Cannot read properties of undefined (reading 'source')，具体原因暂未知，可能是缺少传参所致，放在try中
+                    try {
                         $(firstStartOperation).click();
-                        localStorage.setItem('prevId', thisId2);
-                    }, 500)
+                    } catch(e){
+                        console.log(`%c自动点击第一条开始学习出错，stack: ${e.stack}`, 'color: red');
+                    }
+                    localStorage.setItem('prevId', thisId2);
                 }
                 return false
             }
@@ -83,10 +88,21 @@
             $('.alert-wrapper .btn-ok').click();
         }
 
+        // 您当前的学习出现异常，请根据完成进度，继续学习
+        if($('.alert-wrapper .alert-text').text().match('您当前的学习出现异常，请根据完成进度，继续学习')) {
+            $('.alert-wrapper .btn-ok').click();
+        }
+
         // 若出现网络不稳定的提示（弹窗形式直接点击确认）
         if ($('.vjs-netslow .slow-txt').text() === '网络不稳定，请刷新重试') {
             $('.vjs-netslow .slow-img').click();
         }
+
+        // 视频播放结束时将isPlaying设置为false
+        // if ($('.anew-study-wrapper .anew-content .anew-text').text() === '您已完成该课程的学习') {
+        //     localStorage.setItem('isPlaying', 'false');
+        //     console.log('当前视频播放完成，视频暂停')
+        // }
 
         // 如果视频暂停，点击播放
         if (videoDom && videoDom.paused) {
@@ -94,9 +110,13 @@
         }
 
         // 非暂停即为播放
-        let isPlaying = !videoDom.paused;
-        console.log(`当前视频%c${isPlaying ? '正在' : '不在'}%c播放`, 'color: black;background:yellow;', 'color: white');
-        localStorage.setItem('isPlaying', isPlaying);
+        if(videoDom){
+            let isPlaying = !videoDom.paused;
+            console.log(`当前视频%c${isPlaying ? '正在' : '不在'}%c播放`, 'color: black;background:yellow;', 'color: white');
+            localStorage.setItem('isPlaying', isPlaying);
+        } else {
+            console.log(`当前视频%c无法%c播放，已停止`, 'color: black;background:yellow;', 'color: white');
+        }
     }
 
     // 视频播放页面处理函数
@@ -230,11 +250,6 @@
                         console.log('窗口关闭，视频暂停')
                     }
 
-                    // 视频播放结束时将isPlaying设置为false
-                    if ($('.anew-study-wrapper .anew-content .anew-text').text() === '您已完成该课程的学习') {
-                        localStorage.setItem('isPlaying', 'false');
-                        console.log('当前视频播放完成，视频暂停')
-                    }
                     clearInterval(timer2);
                 } else {
                     console.log('0.等待页面加载完成...');
