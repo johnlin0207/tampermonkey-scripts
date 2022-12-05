@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         中油e学自动续集脚本
 // @namespace    http://tampermonkey.net/
-// @version      0.9
+// @version      0.9.1
 // @description  自动续集播放列表，监听当前播放状态自动开始播放
 // @author       https://github.com/johnlin0207
 // @match        https://www.excnpc.com/
@@ -14,7 +14,13 @@
   "use strict";
   const $ = window.$ || window.jQuery;
   let findVideoInListAndOpenTimer = null;
+  let learningPageMountedTimer = null;
   const o = {};
+  // o.currentLearingFinished 表示当前学习页的视频列表是否播放完成，进入页面默认false，当前章节的待播放视频全部播放完成后设为true
+  // 当前章节的待播放视频全部播放完成(设为true)后需要做的事
+  // 1,不再强制自动执行点击播放操作
+  // 2,清空监听学习页面状态计时器
+  // 3,跳转至404页面节省内存防止卡死
   // 视频列表页处理函数
   o.findAndPlayVideoFn = () => {
     let playLists = $(".subject-catalog").find(".catalog-state-info");
@@ -127,9 +133,9 @@
     if ($(".vjs-netslow .slow-txt").text() === "网络不稳定，请刷新重试") {
       $(".vjs-netslow .slow-img").click();
     }
-
-    // 如果视频暂停，点击播放
-    if (videoDom && videoDom.paused) {
+    // 如果当前视频播放列表没有全部播放完成时，如果视频暂停，点击播放
+    if (!o.currentLearingFinished && videoDom && videoDom.paused) {
+      console.log("点击播放按钮");
       videoDom.play();
     }
 
@@ -161,7 +167,8 @@
     } else if (pdfViewer) {
       o.learningPageFn2();
     } else {
-      console.log(">>>未匹配到学习类型，执行停止");
+      console.log(">>>未匹配到学习类型或当前类型不支持自动播放，执行停止");
+      clearInterval(learningPageMountedTimer);
     }
   };
 
@@ -323,8 +330,10 @@
     if (location.hash.match(/^#\/study\/course\/detail/)) {
       // 打开播放页面后正式播放前将isPlaying设置为hasOpened，防止有的浏览器打开后未自动播放而导致列表页重复打开新播放页导致内存占满浏览器崩溃
       localStorage.setItem("isPlaying", "hasOpened");
-      const timer2 = setInterval(() => {
-        // 学习内容是视频
+      // 记录进入视频页后多少秒
+      let counter = 0;
+      learningPageMountedTimer = setInterval(() => {
+        // 学习内容是视频,注意不可定位到video选择器,在一些学习页面可能会出现找不到video的情况
         const videoDom = $(".player-wrapper .player-content video")[0];
         // 学习内容是pdf文档
         const pdfViewer = $(".player-wrapper .player-content .pdfViewer")[0];
@@ -341,6 +350,9 @@
           // 已学习完成，清除学习页面轮询计时器
           if (o.currentLearingFinished) {
             clearInterval(timer3);
+            // window.close必须作用于window.open返回的对象才能关闭当前页，拿不到这个对象所以无法关闭当前视频播放页
+            // 视频播放页的待播放列表全部播放完成后跳转至不存在的页面
+            location.href = "/finishedPage";
           }
 
           // 关闭学习页面时将isPlaying设置为false
@@ -350,9 +362,17 @@
             console.log("窗口关闭，学习暂停");
           };
 
-          clearInterval(timer2);
+          clearInterval(learningPageMountedTimer);
         } else {
           console.log("0.等待页面加载完成...");
+          counter++;
+          // 若进入视频页5秒后还找不到对应DOM，可能是页面结构不符或还未做兼容，直接停止操作
+          if (counter >= 6) {
+            clearInterval(learningPageMountedTimer);
+            console.log(
+              `进入视频页${counter}秒后还找不到对应DOM，可能是页面结构不符或还未做兼容，直接停止操作，防止重复打开无限页面卡死`
+            );
+          }
         }
       }, 1000);
     }
