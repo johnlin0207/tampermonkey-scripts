@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         中油e学自动续集脚本
 // @namespace    http://tampermonkey.net/
-// @version      0.9.1
+// @version      0.9.2
 // @description  自动续集播放列表，监听当前播放状态自动开始播放
 // @author       https://github.com/johnlin0207
 // @match        https://www.excnpc.com/
@@ -143,13 +143,13 @@
     if (videoDom) {
       let isPlaying = !videoDom.paused;
       console.log(
-        `当前视频%c${isPlaying ? "正在" : "不在"}%c播放`,
+        `当前视频%c${isPlaying ? "正在" : "不在"}播放`,
         "color: black;background:yellow;"
       );
       localStorage.setItem("isPlaying", isPlaying);
     } else {
       console.log(
-        `当前视频%c无法%c播放，已停止`,
+        `当前视频%c无法播放，已停止`,
         "color: black;background:yellow;"
       );
     }
